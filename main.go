@@ -19,6 +19,6 @@ func main() {
 		Addr:    addr,
 		Handler: sm,
 	}
-	fmt.Printf("Listening at %s\n", addr)
+	fmt.Printf("Stream server listening on %s\n", addr)
 	log.Fatal(server.ListenAndServe())
 }
