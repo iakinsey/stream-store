@@ -44,7 +44,7 @@ func Uploader(w http.ResponseWriter, r *http.Request) {
 	body := r.Body
 
 	for {
-		n, checksum, err := readBlock(body, h, f)
+		checksum, err := readBlock(body, h, f)
 
 		if err != nil {
 			code := 500
@@ -62,10 +62,10 @@ func Uploader(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if n != chunkSize {
+		if checksum != nil {
 			code := 200
-			message := hex.EncodeToString(checksum)
-			err := finalizeFile(f, checksum)
+			err := finalizeFile(f, *checksum)
+			message := http.StatusText(http.StatusInternalServerError)
 
 			if err != nil {
 				code = 500
@@ -81,58 +81,66 @@ func Uploader(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func readBlock(body io.ReadCloser, h hash.Hash, f *os.File) (n int, checksum []byte, err error) {
-	buf := make([]byte, chunkSize)
-	n, err = body.Read(buf)
+func readBlock(body io.ReadCloser, h hash.Hash, f *os.File) (finalChecksum *string, err error) {
+	checksum, err := getChecksum(body)
 
 	if err != nil {
-		return n, checksum, err
+		return nil, err
+	}
+
+	buf := make([]byte, chunkSize)
+	n, err := body.Read(buf)
+
+	if err != nil {
+		return nil, err
 	}
 
 	chunk := buf[0:n]
-	checksum, err = checksumBlock(chunk, body, h)
 
-	if err == nil {
-		f.Write(chunk)
+	if err = checksumBlock(chunk, checksum, h); err != nil {
+		return nil, err
+	} else if n != chunkSize {
+		checksum := hex.EncodeToString(checksum)
+		return &checksum, err
 	}
 
-	return n, checksum, err
+	return nil, nil
 }
 
-func checksumBlock(chunk []byte, body io.ReadCloser, h hash.Hash) (result []byte, err error) {
-	expected := make([]byte, checksumSize)
-	n, err := body.Read(expected)
+func getChecksum(body io.ReadCloser) ([]byte, error) {
+	checksum := make([]byte, checksumSize)
+	n, err := body.Read(checksum)
 
-	if err != nil {
-		return result, err
-	} else if n != checksumSize {
-		return result, &errs.HTTPError{
+	if n != checksumSize {
+		return checksum, &errs.HTTPError{
 			Code: 400,
-			Err:  fmt.Errorf("Invalid checksum size: %d", n),
+			Err:  fmt.Errorf("Invalid checksum size %d", n),
 		}
 	}
 
+	return checksum, err
+}
+
+func checksumBlock(chunk, expectedChecksum []byte, h hash.Hash) error {
 	h.Write(chunk)
-	actual := h.Sum(nil)
 
-	if actual := h.Sum(nil); bytes.Compare(expected, actual) != 0 {
-		return result, &errs.HTTPError{
+	if actualChecksum := h.Sum(nil); bytes.Compare(expectedChecksum, actualChecksum) != 0 {
+		return &errs.HTTPError{
 			Code: 409,
-			Err:  fmt.Errorf("Integrity error, wanted %x, found %x", expected, actual),
+			Err:  fmt.Errorf("Integrity error, wanted %x, found %x", expectedChecksum, actualChecksum),
 		}
 	}
 
-	return actual, nil
+	return nil
 }
 
 func clearTempFile(f *os.File) {
 	log.Println(os.Remove(f.Name()))
 }
 
-func finalizeFile(f *os.File, checksum []byte) error {
-	checksumStr := hex.EncodeToString(checksum)
+func finalizeFile(f *os.File, checksum string) error {
 	storeDir := getOrCreateStoreDir()
-	finalPath := path.Join(storeDir, checksumStr)
+	finalPath := path.Join(storeDir, checksum)
 
 	return os.Rename(f.Name(), finalPath)
 }

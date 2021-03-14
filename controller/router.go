@@ -10,9 +10,9 @@ import (
 func Router(w http.ResponseWriter, r *http.Request) {
 	method := r.Method
 
-	if method == http.MethodGet {
+	if method == http.MethodPut {
 		Uploader(w, r)
-	} else if method == http.MethodPut {
+	} else if method == http.MethodGet {
 		Downloader(w, r)
 	} else if method == http.MethodDelete {
 		Deleter(w, r)
