@@ -7,8 +7,11 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
+	"path"
 
 	"github.com/iakinsey/stream-store/errs"
 	"github.com/iakinsey/stream-store/util"
@@ -28,11 +31,13 @@ const chunkSize = 128 << 10
 
 // Uploader ...
 func Uploader(w http.ResponseWriter, r *http.Request) {
-	// TODO get tempfile path and move on success
-	f, err := os.Open("")
+	// TODO move and delete temp file
+	f, err := ioutil.TempFile(os.TempDir(), "streamstore")
 
 	if err != nil {
-		panic(err)
+		status := http.StatusInternalServerError
+		util.Respond(w, status, http.StatusText(status))
+		log.Fatalf(err.Error())
 	}
 
 	h := sha1.New()
@@ -43,23 +48,37 @@ func Uploader(w http.ResponseWriter, r *http.Request) {
 
 		if err != nil {
 			code := 500
-			message := "Internal server error."
+			message := http.StatusText(http.StatusInternalServerError)
 
 			if e, ok := err.(*errs.HTTPError); ok {
 				code = e.Code
 				message = e.Err.Error()
+			} else {
+				log.Println(message)
+			}
+
+			util.Respond(w, code, message)
+			clearTempFile(f)
+			return
+		}
+
+		if n != chunkSize {
+			code := 200
+			message := hex.EncodeToString(checksum)
+			err := finalizeFile(f, checksum)
+
+			if err != nil {
+				code = 500
+				message = http.StatusText(http.StatusInternalServerError)
+				log.Println(message)
+
+				clearTempFile(f)
 			}
 
 			util.Respond(w, code, message)
 			return
 		}
-
-		if n != chunkSize {
-			util.Respond(w, 200, hex.EncodeToString(checksum))
-			return
-		}
 	}
-
 }
 
 func readBlock(body io.ReadCloser, h hash.Hash, f *os.File) (n int, checksum []byte, err error) {
@@ -104,4 +123,36 @@ func checksumBlock(chunk []byte, body io.ReadCloser, h hash.Hash) (result []byte
 	}
 
 	return actual, nil
+}
+
+func clearTempFile(f *os.File) {
+	log.Println(os.Remove(f.Name()))
+}
+
+func finalizeFile(f *os.File, checksum []byte) error {
+	checksumStr := hex.EncodeToString(checksum)
+	storeDir := getOrCreateStoreDir()
+	finalPath := path.Join(storeDir, checksumStr)
+
+	return os.Rename(f.Name(), finalPath)
+}
+
+func getOrCreateStoreDir() string {
+	execPath, err := os.Executable()
+
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
+
+	storeDir := path.Join(path.Dir(execPath), "store")
+
+	if _, err = os.Stat(storeDir); os.IsNotExist(err) {
+		err = os.Mkdir(storeDir, 0755)
+
+		if err != nil {
+			log.Fatalf(err.Error())
+		}
+	}
+
+	return storeDir
 }
