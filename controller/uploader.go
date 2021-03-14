@@ -31,7 +31,6 @@ const chunkSize = 128 << 10
 
 // Uploader ...
 func Uploader(w http.ResponseWriter, r *http.Request) {
-	// TODO move and delete temp file
 	f, err := ioutil.TempFile(os.TempDir(), "streamstore")
 
 	if err != nil {
@@ -81,7 +80,7 @@ func Uploader(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func readBlock(body io.ReadCloser, h hash.Hash, f *os.File) (finalChecksum *string, err error) {
+func readBlock(body io.Reader, h hash.Hash, f *os.File) (finalChecksum *string, err error) {
 	checksum, err := getChecksum(body)
 
 	if err != nil {
@@ -89,6 +88,7 @@ func readBlock(body io.ReadCloser, h hash.Hash, f *os.File) (finalChecksum *stri
 	}
 
 	buf := make([]byte, chunkSize)
+	// TODO This should be a channel or something instead, its not reading all the bytes
 	n, err := body.Read(buf)
 
 	if err != nil {
@@ -107,7 +107,7 @@ func readBlock(body io.ReadCloser, h hash.Hash, f *os.File) (finalChecksum *stri
 	return nil, nil
 }
 
-func getChecksum(body io.ReadCloser) ([]byte, error) {
+func getChecksum(body io.Reader) ([]byte, error) {
 	checksum := make([]byte, checksumSize)
 	n, err := body.Read(checksum)
 
