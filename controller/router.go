@@ -14,6 +14,8 @@ func Router(w http.ResponseWriter, r *http.Request) {
 		Uploader(w, r)
 	} else if method == http.MethodPut {
 		Downloader(w, r)
+	} else if method == http.MethodDelete {
+		Deleter(w, r)
 	} else {
 		text := http.StatusText(http.StatusMethodNotAllowed)
 		util.Respond(w, http.StatusMethodNotAllowed, text)
