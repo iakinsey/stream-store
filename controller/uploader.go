@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"hash"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -31,14 +30,7 @@ const chunkSize = 128 << 10
 
 // Uploader ...
 func Uploader(w http.ResponseWriter, r *http.Request) {
-	f, err := ioutil.TempFile(os.TempDir(), "streamstore")
-
-	if err != nil {
-		status := http.StatusInternalServerError
-		util.Respond(w, status, http.StatusText(status))
-		log.Fatalf(err.Error())
-	}
-
+	f := util.NewTempFile()
 	h := sha1.New()
 	body := r.Body
 
@@ -63,8 +55,8 @@ func Uploader(w http.ResponseWriter, r *http.Request) {
 
 		if checksum != nil {
 			code := 200
-			err := finalizeFile(f, *checksum)
-			message := http.StatusText(http.StatusInternalServerError)
+			message := *checksum
+			err := finalizeFile(f, message)
 
 			if err != nil {
 				code = 500
@@ -83,15 +75,18 @@ func Uploader(w http.ResponseWriter, r *http.Request) {
 func readBlock(body io.Reader, h hash.Hash, f *os.File) (finalChecksum *string, err error) {
 	checksum, err := getChecksum(body)
 
-	if err != nil {
+	if err != nil && err == io.EOF {
+		finalChecksumVal := hex.EncodeToString(h.Sum(nil))
+		return &finalChecksumVal, nil
+	} else if err != nil {
 		return nil, err
 	}
 
 	buf := make([]byte, chunkSize)
 	// TODO This should be a channel or something instead, its not reading all the bytes
-	n, err := body.Read(buf)
+	n, err := io.ReadFull(body, buf)
 
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return nil, err
 	}
 
@@ -109,9 +104,11 @@ func readBlock(body io.Reader, h hash.Hash, f *os.File) (finalChecksum *string, 
 
 func getChecksum(body io.Reader) ([]byte, error) {
 	checksum := make([]byte, checksumSize)
-	n, err := body.Read(checksum)
+	n, err := io.ReadFull(body, checksum)
 
-	if n != checksumSize {
+	if err == io.EOF {
+		return checksum, err
+	} else if n != checksumSize {
 		return checksum, &errs.HTTPError{
 			Code: 400,
 			Err:  fmt.Errorf("Invalid checksum size %d", n),
@@ -139,28 +136,14 @@ func clearTempFile(f *os.File) {
 }
 
 func finalizeFile(f *os.File, checksum string) error {
-	storeDir := getOrCreateStoreDir()
+	storeDir := util.GetOrCreateAppRelativeDir("store")
 	finalPath := path.Join(storeDir, checksum)
 
-	return os.Rename(f.Name(), finalPath)
-}
+	err := os.Rename(f.Name(), finalPath)
 
-func getOrCreateStoreDir() string {
-	execPath, err := os.Executable()
-
-	if err != nil {
-		log.Fatalf(err.Error())
+	if e, ok := err.(*os.LinkError); ok {
+		return e
 	}
 
-	storeDir := path.Join(path.Dir(execPath), "store")
-
-	if _, err = os.Stat(storeDir); os.IsNotExist(err) {
-		err = os.Mkdir(storeDir, 0755)
-
-		if err != nil {
-			log.Fatalf(err.Error())
-		}
-	}
-
-	return storeDir
+	return err
 }
