@@ -19,11 +19,14 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return 404 here if it doesnt exist
-	f, err := util.GetStoreFile(checksum)
+	exists, f, err := util.GetStoreFile(checksum)
 
-	if err != nil {
+	if !exists {
+		util.RespondStandard(w, http.StatusNotFound)
+		return
+	} else if err != nil {
 		util.RespondInternalError(w, err)
+		return
 	}
 
 	h := sha1.New()

@@ -102,8 +102,9 @@ func getChecksum(body io.Reader) ([]byte, error) {
 }
 
 func checksumBlock(chunk, expectedChecksum []byte, h hash.Hash) error {
-	// TODO handle error that returns here
-	h.Write(chunk)
+	if _, err := h.Write(chunk); err != nil {
+		return err
+	}
 
 	if actualChecksum := h.Sum(nil); bytes.Compare(expectedChecksum, actualChecksum) != 0 {
 		return &errs.HTTPError{

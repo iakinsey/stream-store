@@ -54,9 +54,15 @@ func NewTempFile() (f *os.File) {
 }
 
 // GetStoreFile ...
-func GetStoreFile(name string) (*os.File, error) {
+func GetStoreFile(name string) (bool, *os.File, error) {
 	tempDir := GetOrCreateAppRelativeDir(config.StoreFolderName)
 	filePath := path.Join(tempDir, name)
 
-	return os.Open(filePath)
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return false, nil, nil
+	}
+
+	f, err := os.Open(filePath)
+
+	return true, f, err
 }
