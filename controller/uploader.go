@@ -73,11 +73,9 @@ func Uploader(w http.ResponseWriter, r *http.Request) {
 }
 
 func readBlock(body io.Reader, h hash.Hash, f *os.File) (finalChecksum *string, err error) {
-	log.Println("Checksum")
 	checksum, err := getChecksum(body)
 
 	if err == io.EOF {
-		log.Println("EOF at checksum")
 		finalChecksumVal := hex.EncodeToString(h.Sum(nil))
 		return &finalChecksumVal, nil
 	} else if err != nil {
@@ -86,15 +84,10 @@ func readBlock(body io.Reader, h hash.Hash, f *os.File) (finalChecksum *string, 
 
 	buf := make([]byte, chunkSize)
 	// TODO This should be a channel or something instead, its not reading all the bytes
-	log.Println("Read")
 	n, err := io.ReadFull(body, buf)
 
-	if err != nil && err != io.EOF {
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 		return nil, err
-	}
-
-	if err == io.EOF {
-		log.Println("EOF at read")
 	}
 
 	chunk := buf[0:n]
