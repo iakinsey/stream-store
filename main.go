@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 
@@ -19,6 +18,6 @@ func main() {
 		Addr:    addr,
 		Handler: sm,
 	}
-	fmt.Printf("Stream server listening on %s\n", addr)
+	log.Printf("Stream server listening on %s\n", addr)
 	log.Fatal(server.ListenAndServe())
 }
