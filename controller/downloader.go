@@ -4,7 +4,6 @@ import (
 	"crypto/sha1"
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/iakinsey/stream-store/config"
 	"github.com/iakinsey/stream-store/util"
@@ -12,7 +11,7 @@ import (
 
 // Downloader ...
 func Downloader(w http.ResponseWriter, r *http.Request) {
-	checksum := getChecksumFromURL(r.URL.Path)
+	checksum := util.GetChecksumFromURL(r.URL.Path)
 
 	if checksum == "" {
 		util.Respond(w, http.StatusBadRequest, "No checksum specified in URL")
@@ -54,15 +53,4 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-}
-
-func getChecksumFromURL(path string) string {
-	tokens := strings.Split(path, "/")
-	checksum := tokens[len(tokens)-1]
-
-	if len(checksum) != config.ChecksumSize {
-		return ""
-	}
-
-	return checksum
 }

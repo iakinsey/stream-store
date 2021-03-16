@@ -3,6 +3,7 @@ package util
 import (
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/iakinsey/stream-store/config"
 )
@@ -31,4 +32,16 @@ func RespondInternalError(w http.ResponseWriter, err error) {
 func IssueWriteError(w http.ResponseWriter, err error) {
 	log.Println(err.Error())
 	w.Write(config.WriteErrorContent)
+}
+
+// GetChecksumFromURL extracts the file checksum from the request URL
+func GetChecksumFromURL(path string) string {
+	tokens := strings.Split(path, "/")
+	checksum := tokens[len(tokens)-1]
+
+	if len(checksum) != config.ChecksumSize {
+		return ""
+	}
+
+	return checksum
 }

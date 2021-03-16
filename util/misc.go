@@ -66,3 +66,19 @@ func GetStoreFile(name string) (bool, *os.File, error) {
 
 	return true, f, err
 }
+
+// DeleteStoreFile ...
+func DeleteStoreFile(name string) (bool, error) {
+	tempDir := GetOrCreateAppRelativeDir(config.StoreFolderName)
+	filePath := path.Join(tempDir, name)
+
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return false, nil
+	}
+
+	if err := os.Remove(name); err != nil {
+		return true, err
+	}
+
+	return true, nil
+}
