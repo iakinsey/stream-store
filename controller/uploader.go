@@ -83,7 +83,6 @@ func readBlock(body io.Reader, h hash.Hash, f *os.File) (finalChecksum *string, 
 	}
 
 	buf := make([]byte, chunkSize)
-	// TODO This should be a channel or something instead, its not reading all the bytes
 	n, err := io.ReadFull(body, buf)
 
 	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
