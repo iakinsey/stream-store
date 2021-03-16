@@ -12,21 +12,10 @@ import (
 	"os"
 	"path"
 
+	"github.com/iakinsey/stream-store/config"
 	"github.com/iakinsey/stream-store/errs"
 	"github.com/iakinsey/stream-store/util"
 )
-
-// BadRequest ...
-type BadRequest error
-
-// ConflictError ...
-type ConflictError error
-
-// Size of checksum block
-const checksumSize = sha1.Size
-
-// Size of content chunk block
-const chunkSize = 128 << 10
 
 // Uploader ...
 func Uploader(w http.ResponseWriter, r *http.Request) {
@@ -38,35 +27,26 @@ func Uploader(w http.ResponseWriter, r *http.Request) {
 		checksum, err := readBlock(body, h, f)
 
 		if err != nil {
-			code := 500
-			message := http.StatusText(http.StatusInternalServerError)
-
 			if e, ok := err.(*errs.HTTPError); ok {
-				code = e.Code
-				message = e.Err.Error()
+				util.Respond(w, e.Code, e.Err.Error())
 			} else {
-				log.Println(message)
+				util.RespondInternalError(w, err)
 			}
 
-			util.Respond(w, code, message)
 			clearTempFile(f)
 			return
 		}
 
 		if checksum != nil {
-			code := 200
-			message := *checksum
-			err := finalizeFile(f, message)
+			err := finalizeFile(f, *checksum)
 
 			if err != nil {
-				code = 500
-				message = http.StatusText(http.StatusInternalServerError)
-				log.Println(message)
-
+				util.RespondInternalError(w, err)
 				clearTempFile(f)
+			} else {
+				util.Respond(w, http.StatusCreated, *checksum)
 			}
 
-			util.Respond(w, code, message)
 			return
 		}
 	}
@@ -82,7 +62,7 @@ func readBlock(body io.Reader, h hash.Hash, f *os.File) (finalChecksum *string, 
 		return nil, err
 	}
 
-	buf := make([]byte, chunkSize)
+	buf := make([]byte, config.ChunkSize)
 	n, err := io.ReadFull(body, buf)
 
 	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
@@ -97,7 +77,7 @@ func readBlock(body io.Reader, h hash.Hash, f *os.File) (finalChecksum *string, 
 
 	f.Write(chunk)
 
-	if n != chunkSize {
+	if n != config.ChunkSize {
 		checksum := hex.EncodeToString(checksum)
 		return &checksum, err
 	}
@@ -106,12 +86,12 @@ func readBlock(body io.Reader, h hash.Hash, f *os.File) (finalChecksum *string, 
 }
 
 func getChecksum(body io.Reader) ([]byte, error) {
-	checksum := make([]byte, checksumSize)
+	checksum := make([]byte, config.ChecksumSize)
 	n, err := io.ReadFull(body, checksum)
 
 	if err == io.EOF {
 		return checksum, err
-	} else if n != checksumSize {
+	} else if n != config.ChecksumSize {
 		return checksum, &errs.HTTPError{
 			Code: 400,
 			Err:  fmt.Errorf("Invalid checksum size %d", n),
@@ -122,6 +102,7 @@ func getChecksum(body io.Reader) ([]byte, error) {
 }
 
 func checksumBlock(chunk, expectedChecksum []byte, h hash.Hash) error {
+	// TODO handle error that returns here
 	h.Write(chunk)
 
 	if actualChecksum := h.Sum(nil); bytes.Compare(expectedChecksum, actualChecksum) != 0 {
@@ -139,7 +120,7 @@ func clearTempFile(f *os.File) {
 }
 
 func finalizeFile(f *os.File, checksum string) error {
-	storeDir := util.GetOrCreateAppRelativeDir("store")
+	storeDir := util.GetOrCreateAppRelativeDir(config.StoreFolderName)
 	finalPath := path.Join(storeDir, checksum)
 
 	err := os.Rename(f.Name(), finalPath)

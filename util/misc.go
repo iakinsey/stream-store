@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 	"path"
+
+	"github.com/iakinsey/stream-store/config"
 )
 
 // Environ ...
@@ -41,12 +43,20 @@ func GetOrCreateAppRelativeDir(name string) string {
 
 // NewTempFile ...
 func NewTempFile() (f *os.File) {
-	tempDir := GetOrCreateAppRelativeDir("download")
-	f, err := ioutil.TempFile(tempDir, "streamstore")
+	tempDir := GetOrCreateAppRelativeDir(config.DownloadFolderName)
+	f, err := ioutil.TempFile(tempDir, config.TempDownloadPrefix)
 
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
 
 	return f
+}
+
+// GetStoreFile ...
+func GetStoreFile(name string) (*os.File, error) {
+	tempDir := GetOrCreateAppRelativeDir(config.StoreFolderName)
+	filePath := path.Join(tempDir, name)
+
+	return os.Open(filePath)
 }
