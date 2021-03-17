@@ -39,7 +39,7 @@ func GetChecksumFromURL(path string) string {
 	tokens := strings.Split(path, "/")
 	checksum := tokens[len(tokens)-1]
 
-	if len(checksum) != config.ChecksumSize {
+	if len(checksum) != config.ChecksumStringSize {
 		return ""
 	}
 

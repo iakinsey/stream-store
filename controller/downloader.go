@@ -29,27 +29,42 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h := sha1.New()
+	complete := false
 
-	w.WriteHeader(http.StatusContinue)
+	w.WriteHeader(http.StatusAccepted)
 
 	for {
 		buf := make([]byte, config.ChunkSize)
-		_, err := io.ReadFull(f, buf)
+		n, err := io.ReadFull(f, buf)
 
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
-			return
+			complete = true
 		} else if err != nil {
 			util.IssueWriteError(w, err)
 			return
 		}
 
-		if _, err := h.Write(buf); err != nil {
+		chunk := buf[0:n]
+
+		// Update hash
+		if _, err := h.Write(chunk); err != nil {
 			util.IssueWriteError(w, err)
 			return
 		}
 
-		if _, err = w.Write(buf); err != nil {
+		// Write hash to client
+		if _, err = w.Write(h.Sum(nil)); err != nil {
 			util.IssueWriteError(w, err)
+			return
+		}
+
+		// Write bytes to client
+		if _, err = w.Write(chunk); err != nil {
+			util.IssueWriteError(w, err)
+			return
+		}
+
+		if complete {
 			return
 		}
 	}
