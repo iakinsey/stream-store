@@ -76,7 +76,7 @@ func DeleteStoreFile(name string) (bool, error) {
 		return false, nil
 	}
 
-	if err := os.Remove(name); err != nil {
+	if err := os.Remove(filePath); err != nil {
 		return true, err
 	}
 
