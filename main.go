@@ -2,22 +2,21 @@ package main
 
 import (
 	"log"
-	"net/http"
+	"net"
 
-	"github.com/iakinsey/stream-store/controller"
+	"github.com/iakinsey/stream-store/protocol"
 	"github.com/iakinsey/stream-store/util"
 )
 
 func main() {
 	addr := util.Environ("STREAM_STORE_ADDRESS", "0.0.0.0:40865")
-	sm := http.NewServeMux()
 
-	sm.HandleFunc("/", controller.Router)
+	listener, err := net.Listen("tcp", addr)
 
-	server := &http.Server{
-		Addr:    addr,
-		Handler: sm,
+	if listener != nil {
+		log.Fatalf(err.Error())
 	}
+
 	log.Printf("Stream server listening on %s\n", addr)
-	log.Fatal(server.ListenAndServe())
+	log.Fatalf(protocol.Listen(listener).Error())
 }

@@ -1,9 +1,9 @@
 package errs
 
-// HTTPError ...
-type HTTPError struct {
-	Code int
+// ResponseError ...
+type ResponseError struct {
+	Code byte
 	Err  error
 }
 
-func (e *HTTPError) Error() string { return e.Err.Error() }
+func (e *ResponseError) Error() string { return e.Err.Error() }

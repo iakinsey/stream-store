@@ -3,35 +3,36 @@ package controller
 import (
 	"crypto/sha1"
 	"io"
-	"net/http"
+	"net"
 
 	"github.com/iakinsey/stream-store/config"
 	"github.com/iakinsey/stream-store/util"
 )
 
-// Downloader ...
-func Downloader(w http.ResponseWriter, r *http.Request) {
-	checksum := util.GetChecksumFromURL(r.URL.Path)
+// Download ...
+func Download(conn net.Conn) {
+	checksum, err := util.ReadChecksum(conn)
 
-	if checksum == "" {
-		util.Respond(w, http.StatusBadRequest, "No checksum specified in URL")
+	if err != nil {
 		return
 	}
 
 	exists, f, err := util.GetStoreFile(checksum)
 
 	if !exists {
-		util.RespondStandard(w, http.StatusNotFound)
+		util.Respond(conn, config.ResponseNotFound)
 		return
 	} else if err != nil {
-		util.RespondInternalError(w, err)
+		util.RespondInternalError(conn, err)
 		return
 	}
 
 	h := sha1.New()
 	complete := false
 
-	w.WriteHeader(http.StatusAccepted)
+	if err := util.Respond(conn, config.ResponseContinue); err != nil {
+		return
+	}
 
 	for {
 		buf := make([]byte, config.ChunkSize)
@@ -40,7 +41,7 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			complete = true
 		} else if err != nil {
-			util.IssueWriteError(w, err)
+			util.RespondWriteError(conn, err)
 			return
 		}
 
@@ -48,19 +49,19 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 
 		// Update hash
 		if _, err := h.Write(chunk); err != nil {
-			util.IssueWriteError(w, err)
+			util.RespondWriteError(conn, err)
 			return
 		}
 
 		// Write hash to client
-		if _, err = w.Write(h.Sum(nil)); err != nil {
-			util.IssueWriteError(w, err)
+		if _, err = conn.Write(h.Sum(nil)); err != nil {
+			util.RespondWriteError(conn, err)
 			return
 		}
 
 		// Write bytes to client
-		if _, err = w.Write(chunk); err != nil {
-			util.IssueWriteError(w, err)
+		if _, err = conn.Write(chunk); err != nil {
+			util.RespondWriteError(conn, err)
 			return
 		}
 

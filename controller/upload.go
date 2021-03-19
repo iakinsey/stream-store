@@ -8,7 +8,7 @@ import (
 	"hash"
 	"io"
 	"log"
-	"net/http"
+	"net"
 	"os"
 	"path"
 
@@ -17,20 +17,23 @@ import (
 	"github.com/iakinsey/stream-store/util"
 )
 
-// Uploader ...
-func Uploader(w http.ResponseWriter, r *http.Request) {
+// Upload ...
+func Upload(conn net.Conn) {
+	if err := util.Respond(conn, config.ResponseContinue); err != nil {
+		return
+	}
+
 	f := util.NewTempFile()
 	h := sha1.New()
-	body := r.Body
 
 	for {
-		checksum, err := readBlock(body, h, f)
+		checksum, err := readBlock(conn, h, f)
 
 		if err != nil {
-			if e, ok := err.(*errs.HTTPError); ok {
-				util.Respond(w, e.Code, e.Err.Error())
+			if e, ok := err.(*errs.ResponseError); ok {
+				util.HandleResponseError(conn, *e)
 			} else {
-				util.RespondInternalError(w, err)
+				util.RespondInternalError(conn, err)
 			}
 
 			clearTempFile(f)
@@ -41,10 +44,10 @@ func Uploader(w http.ResponseWriter, r *http.Request) {
 			err := finalizeFile(f, *checksum)
 
 			if err != nil {
-				util.RespondInternalError(w, err)
+				util.RespondInternalError(conn, err)
 				clearTempFile(f)
 			} else {
-				util.Respond(w, http.StatusCreated, *checksum)
+				util.Respond(conn, config.ResponseSuccess)
 			}
 
 			return
@@ -92,8 +95,8 @@ func getChecksum(body io.Reader) ([]byte, error) {
 	if err == io.EOF {
 		return checksum, err
 	} else if n != config.ChecksumSize {
-		return checksum, &errs.HTTPError{
-			Code: 400,
+		return checksum, &errs.ResponseError{
+			Code: config.ResponseInvalidChecksum,
 			Err:  fmt.Errorf("Invalid checksum size %d", n),
 		}
 	}
@@ -107,8 +110,8 @@ func checksumBlock(chunk, expectedChecksum []byte, h hash.Hash) error {
 	}
 
 	if actualChecksum := h.Sum(nil); bytes.Compare(expectedChecksum, actualChecksum) != 0 {
-		return &errs.HTTPError{
-			Code: 409,
+		return &errs.ResponseError{
+			Code: config.ResponseChecksumError,
 			Err:  fmt.Errorf("Integrity error, wanted %x, found %x", expectedChecksum, actualChecksum),
 		}
 	}

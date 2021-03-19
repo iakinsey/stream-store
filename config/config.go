@@ -21,6 +21,3 @@ const DownloadFolderName = "download"
 
 // TempDownloadPrefix is the prefix of temp files stored in the download folder
 const TempDownloadPrefix = "streamstore"
-
-// WriteErrorContent is a fixed value sent to the http body indicating internal server error during writes
-var WriteErrorContent = []byte{60, 13, 24, 62, 62, 171, 74, 212, 189, 94, 66, 244, 236, 231, 230, 207}
