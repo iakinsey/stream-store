@@ -24,8 +24,9 @@ func Listen(listener net.Listener) error {
 }
 
 func onConnect(conn net.Conn) {
-	requestBuf := make([]byte, 1)
+	defer conn.Close()
 
+	requestBuf := make([]byte, 1)
 	n, err := io.ReadFull(conn, requestBuf)
 
 	if err != nil {
