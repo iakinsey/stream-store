@@ -13,10 +13,10 @@ func main() {
 
 	listener, err := net.Listen("tcp", addr)
 
-	if listener != nil {
+	if err != nil {
 		log.Fatalf(err.Error())
 	}
 
-	log.Printf("Stream server listening on %s\n", addr)
+	log.Printf("Stream store listening on %s\n", addr)
 	log.Fatalf(protocol.Listen(listener).Error())
 }

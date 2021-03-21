@@ -12,14 +12,14 @@ import (
 
 func Listen(listener net.Listener) error {
 	for {
-		conn, err := listener.Accept()
+		con, err := listener.Accept()
 
 		if err != nil {
 			return err
 		}
 
 		// TODO make into a channel?
-		go onConnect(conn)
+		onConnect(con)
 	}
 }
 

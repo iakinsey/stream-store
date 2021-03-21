@@ -41,13 +41,15 @@ func Upload(conn net.Conn) {
 		}
 
 		if checksum != nil {
-			err := finalizeFile(f, *checksum)
+			err := finalizeFile(f, checksum)
 
 			if err != nil {
 				util.RespondInternalError(conn, err)
 				clearTempFile(f)
 			} else {
-				util.Respond(conn, config.ResponseSuccess)
+				if err := util.Respond(conn, config.ResponseSuccess); err == nil {
+					conn.Write(checksum)
+				}
 			}
 
 			return
@@ -55,12 +57,11 @@ func Upload(conn net.Conn) {
 	}
 }
 
-func readBlock(body io.Reader, h hash.Hash, f *os.File) (finalChecksum *string, err error) {
+func readBlock(body io.Reader, h hash.Hash, f *os.File) ([]byte, error) {
 	checksum, err := getChecksum(body)
 
 	if err == io.EOF {
-		finalChecksumVal := hex.EncodeToString(h.Sum(nil))
-		return &finalChecksumVal, nil
+		return checksum, nil
 	} else if err != nil {
 		return nil, err
 	}
@@ -81,8 +82,7 @@ func readBlock(body io.Reader, h hash.Hash, f *os.File) (finalChecksum *string, 
 	f.Write(chunk)
 
 	if n != config.ChunkSize {
-		checksum := hex.EncodeToString(checksum)
-		return &checksum, err
+		return checksum, err
 	}
 
 	return nil, nil
@@ -123,7 +123,8 @@ func clearTempFile(f *os.File) {
 	log.Println(os.Remove(f.Name()))
 }
 
-func finalizeFile(f *os.File, checksum string) error {
+func finalizeFile(f *os.File, checksumBytes []byte) error {
+	checksum := hex.EncodeToString(checksumBytes)
 	storeDir := util.GetOrCreateAppRelativeDir(config.StoreFolderName)
 	finalPath := path.Join(storeDir, checksum)
 
