@@ -8,7 +8,14 @@ suru: clean
 	rm -f stream-store
 	rm -f config.json
 
+docker: clean
+	docker build . -t stream-store
+	docker run -d stream-store
+	docker cp `docker ps | grep stream-store | tr -s ' ' | cut -d " " -f 1`:/build/stream-store .
+	docker kill `docker ps | grep stream-store | tr -s ' ' | cut -d " " -f 1`
+
 clean:
+	sh -c "docker kill `docker ps | grep stream-store | tr -s ' ' | cut -d " " -f 1`" || :
 	rm -f stream-store
 	rm -f stream-store-suru.zip
 	rm -f config.json
